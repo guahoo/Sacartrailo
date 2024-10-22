@@ -1,0 +1,1 @@
+This app is designed for searching and storing information about trekking routes in Georgia using the OpenStreetMap API.
