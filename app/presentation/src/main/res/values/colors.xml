@@ -61,5 +61,6 @@
     <color name="violet_900">#612FFF</color>
 
     <color name="light_purple">#E3E2FF</color>
+    <color name="light_grey">#EBE9E9</color>
     <color name="dark_teal">#00332D</color>
 </resources>
