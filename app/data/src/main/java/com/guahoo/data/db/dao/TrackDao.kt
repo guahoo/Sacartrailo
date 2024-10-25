@@ -17,13 +17,13 @@ interface TrackDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTracks(tracks: List<TrackEntity>)
 
-    @Query("SELECT * FROM tracks WHERE id = :trackId")
+    @Query("SELECT * FROM trails WHERE id = :trackId")
     suspend fun getTrackById(trackId: Long): TrackEntity?
 
     @Update
     suspend fun updateTrack(track: TrackEntity)
 
-    @Query("SELECT * FROM tracks")
+    @Query("SELECT * FROM trails")
     fun getAllTracks(): List<TrackEntity>
 }
 

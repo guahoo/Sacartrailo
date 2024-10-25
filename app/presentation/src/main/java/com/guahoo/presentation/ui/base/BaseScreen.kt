@@ -81,6 +81,7 @@ class BaseScreen {
         fun TrackMapView(modifier: Modifier = Modifier, tracks: List<Track>) {
             val selectedTrack = remember { mutableStateOf<Marker?>(null) }
             val selectedPolylines = mutableListOf<Polyline>()
+            Log.v("TRACK_COUNT", "${tracks.size}")
 
             OSMDroidMapView(modifier) {
                 overlayManager.clear()
@@ -117,7 +118,7 @@ class BaseScreen {
         private fun MapView.addTrackPolyline(track: Track, selectedPolylines: MutableList<Polyline>) {
             val polyline = Polyline().apply {
                 id = track.groupId.toString()
-                title = track.tags?.get("name")
+                title = track.tags?.get("name") + "\n${track.id.toString()}"
                 color = track.color ?: com.guahoo.data.R.color.black
                 width = 10.0f
                 alpha = 0.8f
@@ -163,8 +164,8 @@ class BaseScreen {
         }
 
         private fun MapView.addStartEndMarkers(mapView: MapView, track: Track, geoPoints: List<GeoPoint>, distance: Int) {
-            val startMarker = createMarker(mapView, geoPoints.first(), track.tags, distance, context = this.context)
-            val endMarker = createMarker(mapView, geoPoints.last(), track.tags, distance, end = true, context = this.context)
+            val startMarker = createMarker(mapView, geoPoints.first(), track.tags, distance, trackId = track.id.toString(), context = this.context)
+            val endMarker = createMarker(mapView, geoPoints.last(), track.tags, distance, end = true, trackId = track.id.toString(), context = this.context)
 
             overlays.add(startMarker)
             overlays.add(endMarker)
@@ -176,12 +177,13 @@ class BaseScreen {
             tags: Map<String, String>?,
             distance: Int,
             end: Boolean = false,
+            trackId: String,
             context: Context
         ): Marker {
             return Marker(mapView).apply {
                 this.position = position
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                title = tags?.get("name")
+                title = tags?.get("name") + "\n${trackId.toString()}"
                 icon = ContextCompat.getDrawable(
                     context, if (end) R.drawable.b_marker else R.drawable.a_marker
                 )

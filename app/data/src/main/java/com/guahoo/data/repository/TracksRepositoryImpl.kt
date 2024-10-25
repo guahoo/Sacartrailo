@@ -1,10 +1,13 @@
 package com.guahoo.data.repository
 
 import android.graphics.Color
+import android.icu.lang.UCharacter.GraphemeClusterBreak.L
+import android.util.Log
 import androidx.room.Transaction
 import com.guahoo.data.db.dao.TrackDao
 import com.guahoo.data.db.model.toDomainModel
 import com.guahoo.data.db.model.toEntity
+import com.guahoo.data.mapper.mapListToDomain
 import com.guahoo.data.mapper.mapToTrack
 import com.guahoo.data.network.TracksApiService
 import com.guahoo.domain.commons.ResultState
@@ -40,7 +43,7 @@ class TracksRepositoryImpl(
             val existingTrack = trackDao.getTrackById(track.id)
             val trackEntity = track.toEntity()
             if (existingTrack != null) {
-                trackDao.updateTrack(trackEntity.copy(dbid = existingTrack.dbid))
+                trackDao.updateTrack(trackEntity)
             } else {
                 trackDao.insertTrack(trackEntity)
             }
@@ -50,17 +53,19 @@ class TracksRepositoryImpl(
         val overpassQuery = createOverpassQuery()
 
         try {
-//            val response = tracksApiService.getTracksByArea(overpassQuery)
-//
-//
-//            val elements = response.elements
-//
-//
-//            insertTracksWithTransaction(processTracks(elements.mapListToDomain()))
+            val response = tracksApiService.getTracksByArea(overpassQuery)
+
+
+            val elements = response.elements
+
+            val trackList =  processTracks(elements.mapListToDomain())
+            insertTracksWithTransaction(
+                trackList
+            )
 
             val tracksFromDb = getAllTracks()
 
-            emit(ResultState.Success(tracksFromDb))
+            emit(ResultState.Success(trackList))
 
         } catch (e: HttpException) {
             emit(ResultState.Error("An unexpected error occurred HTTP: ${e.message}"))
@@ -83,14 +88,14 @@ area["ISO3166-1"="GE"][boundary=administrative][admin_level=2]->.searchArea;
 
 // Find all hiking routes within Georgia's boundaries
 (
-  relation
-    ["route"="hiking"]["type"="route"]
-    ["name"~"Trail|trail|hike|trails|Trails|Hike|Track|track"]
-   (area.searchArea);
-
-  relation
-    ["route"="hiking"]["osmc:symbol"="blue:white:blue_bar"]
-    (area.searchArea);
+//  relation
+//    ["route"="hiking"]["type"="route"]
+//    ["name"~"Trail|trail|hike|trails|Trails|Hike|Track|track"]
+//   (area.searchArea);
+//
+//  relation
+//    ["route"="hiking"]["osmc:symbol"="blue:white:blue_bar"]
+//    (area.searchArea);
 
   relation
     ["route"="hiking"]["osmc:symbol"="red:white:red_bar"]
@@ -122,18 +127,25 @@ out skel qt;
         // Process relations concurrently
         return tracksData
             .filterIsInstance<RelationModel>()
-            .flatMap { relation -> processRelation(relation, waysMap, nodesMap) }
+            .map { relation ->
+                val trackList = processRelation(relation, waysMap, nodesMap)
+                trackList
+
+
+
+            }
     }
+
 
     private fun processRelation(
         relation: RelationModel,
         waysMap: Map<Long, Way>,
         nodesMap: Map<Long, Node>
-    ): List<Track> {
+    ): Track {
         val relationWayIds = relation.waysId ?: listOf()
         val relationColor = Color.parseColor(getRandomColor())  // Generate color once
 
-        val trackList = mutableListOf<Track>()
+        val nodeList = mutableListOf<Node>()
 
         relationWayIds
             .mapNotNull { waysMap[it] }  // Get ways by id from map
@@ -143,18 +155,51 @@ out skel qt;
                 // Map the node IDs to actual Node objects
                 val trackPoints = wayNodes.mapNotNull { nodeId -> nodesMap[nodeId] }
 
-                // Create and add track to the list
-                trackPoints.mapToTrack(
-                    way.id,
-                    relationColor,
-                    relation.id,
-                    relation.tags ?: mapOf()
-                ).let {
-                    trackList.add(it)
+
+
+                if (nodeList.isNotEmpty()){
+                    if (nodeList.last().id == trackPoints.first().id) {
+                        Log.v("asdsadsada","== ${way.id}")
+                        nodeList.addAll(trackPoints)
+                    } else if (nodeList.last().id == trackPoints.last().id) {
+                        Log.v("asdsadsada","reverse ${way.id}")
+                        nodeList.addAll(trackPoints.reversed())
+
+                    } else if (nodeList.last().id != trackPoints.first().id) {
+                        Log.v("asdsadsada","check ${way.id}")
+
+                        // Проверяем, есть ли во втором списке точка с id, уже присутствующим в первом списке
+                        val matchingPointIndex = trackPoints.indexOfFirst { point ->
+                            nodeList.any { it.id == point.id }
+                        }
+
+                        if (matchingPointIndex != -1) {
+                            // Если повторяющаяся точка найдена, берем из первого листа точки от этой точки до конца
+                            val matchingId = trackPoints[matchingPointIndex].id
+                            val newSubList = nodeList.dropWhile { it.id != matchingId }
+
+                            // Реверсируем новый подсписок и добавляем его к первому листу
+                            nodeList.addAll(newSubList.reversed())
+                            nodeList.addAll(trackPoints)
+                        } else {
+                            nodeList.addAll(trackPoints)
+                        }
+
+
+                    }
+
+                } else {
+                    nodeList.addAll(trackPoints)
                 }
             }
 
-        return trackList
+        return Track(
+            nodes = nodeList,
+            groupId = relation.id,
+            tags = relation.tags,
+            id = relation.id,
+            color = relationColor
+        )
     }
 
 

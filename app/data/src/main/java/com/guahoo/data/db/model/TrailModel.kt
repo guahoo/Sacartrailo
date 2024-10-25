@@ -7,12 +7,11 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverters
 
-@Entity(tableName = "tracks")
+@Entity(tableName = "trails")
 
 data class TrackEntity(
+    @PrimaryKey
     val id: Long = 0L,
-    @PrimaryKey(autoGenerate = true)
-    val dbid: Long=0L,
     val groupId: Long,
     @TypeConverters(NodeConverter::class) val nodes: List<NodeEntity>? = null,
     @TypeConverters(TagConverter::class) val tags: Map<String,String>? = mapOf(),
