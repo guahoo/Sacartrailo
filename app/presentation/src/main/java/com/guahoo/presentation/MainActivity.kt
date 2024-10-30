@@ -16,11 +16,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val weatherViewModel: TrailsViewModel by viewModels()
+        val trailsViewModel: TrailsViewModel by viewModels()
         Configuration.getInstance().userAgentValue = BuildConfig.LIBRARY_PACKAGE_NAME + "/" + BuildConfig.VERSION_NAME
         setContent {
             ComposeApplicationTheme {
-                MainScreen(weatherViewModel)
+                MainScreen(trailsViewModel)
             }
         }
     }

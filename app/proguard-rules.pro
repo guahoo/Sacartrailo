@@ -19,3 +19,18 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Keep XmlPullParser and XmlResourceParser
+-dontwarn org.xmlpull.v1.**
+-keep class org.xmlpull.v1.** { *; }
+
+# Keep all model classes that Gson uses for deserialization
+-keep class com.guahoo.data.response.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation
+
+# Keep Gson classes
+-keep class com.google.gson.** { *; }
+
+
+

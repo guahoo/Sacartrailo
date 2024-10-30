@@ -6,19 +6,19 @@ import com.google.gson.annotations.SerializedName
 
 // Root class for the entire JSON response
 data class OverpassResponse(
-    @SerializedName("version") val version: Double,
-    @SerializedName("generator") val generator: String,
-    @SerializedName("osm3s") val osm3s: OSM3S,
-    @SerializedName("elements") val elements: List<Element> // List of elements (relation, node, way)
+    @SerializedName("version") val version: Double = 0.0,
+    @SerializedName("generator") val generator: String = "",
+    @SerializedName("osm3s") val osm3s: OSM3S = OSM3S("",""),
+    @SerializedName("elements") val elements: List<Element> = listOf<Element>()
 )
 
-// Metadata class for osm3s
+
 data class OSM3S(
     @SerializedName("timestamp_osm_base") val timestampOsmBase: String,
     @SerializedName("copyright") val copyright: String
 )
 
-// Sealed class to encapsulate different types of elements (relation, node, way)
+
 sealed class Element {
     data class Relation(
         @SerializedName("type") val type: String,
@@ -77,7 +77,7 @@ data class RelationTags(
 )
 
 fun RelationTags.toMap(): Map<String, String> {
-    Log.v("ToDBTracks", "$description $name $osmcSymbol")
+    Log.d("ToDBTracks", "$description $name $osmcSymbol")
     return mutableMapOf<String, String>().apply {
 
         description?.let { put("description", it) }

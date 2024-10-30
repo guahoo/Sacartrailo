@@ -27,7 +27,7 @@ class GetWeatherUseCase(private val weatherRepository: WeatherRepository) {
             } else if (forecastResult is ResultState.Error) {
                 ResultState.Error(forecastResult.message)
             } else {
-                ResultState.Loading
+                ResultState.Loading("")
             }
         }.mapLatest { resultState ->
             resultState

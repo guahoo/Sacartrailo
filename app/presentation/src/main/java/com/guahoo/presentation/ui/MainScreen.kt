@@ -20,7 +20,7 @@ fun MainScreen(viewModel: TrailsViewModel) {
             startDestination = "forecast",
             modifier = Modifier.padding(innerPadding)
         ){
-            composable("forecast") { WeatherForecastScreen(viewModel) }
+            composable("forecast") { InitTrackScreen(viewModel) }
         }
     }
 }

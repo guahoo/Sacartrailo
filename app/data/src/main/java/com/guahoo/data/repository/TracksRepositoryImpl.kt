@@ -10,6 +10,7 @@ import com.guahoo.data.db.model.toEntity
 import com.guahoo.data.mapper.mapListToDomain
 import com.guahoo.data.mapper.mapToTrack
 import com.guahoo.data.network.TracksApiService
+import com.guahoo.data.preferenses.PreferencesService
 import com.guahoo.domain.commons.ResultState
 import com.guahoo.domain.entity.Node
 import com.guahoo.domain.entity.OverpassElement
@@ -25,7 +26,8 @@ import kotlin.random.Random
 
 class TracksRepositoryImpl(
     private val tracksApiService: TracksApiService,
-    private val trackDao: TrackDao
+    private val trackDao: TrackDao,
+    private val preferencesService: PreferencesService
 ) : TracksRepository {
 
     override fun getAllTracks(): List<Track> {
@@ -34,18 +36,25 @@ class TracksRepositoryImpl(
 
     @Transaction
     suspend fun insertTracksWithTransaction(tracks: List<Track>) {
+        com.guahoo.data.network.L.d("REPOS123 ${tracks.size}")
         tracks.forEach { insertTrackOrUpdateTrack(it) }
     }
 
 
 
     override suspend fun insertTrackOrUpdateTrack(track: Track) {
+        com.guahoo.data.network.L.d("REPOS1336 ${track}")
             val existingTrack = trackDao.getTrackById(track.id)
+        com.guahoo.data.network.L.d("REPOS ${track}")
             val trackEntity = track.toEntity()
+        com.guahoo.data.network.L.d("REPOS1 ${track}")
             if (existingTrack != null) {
+                com.guahoo.data.network.L.d("REPOS2 ${track}")
                 trackDao.updateTrack(trackEntity)
             } else {
+                com.guahoo.data.network.L.d("REPOS3 ${track}")
                 trackDao.insertTrack(trackEntity)
+                com.guahoo.data.network.L.d("REPOS4 ${track}")
             }
         }
 
@@ -53,17 +62,31 @@ class TracksRepositoryImpl(
         val overpassQuery = createOverpassQuery()
 
         try {
-            val response = tracksApiService.getTracksByArea(overpassQuery)
+      //      if (preferencesService.trackIsDownloaded.isNullOrEmpty()){
+                emit(ResultState.Loading("Downloading tracks"))
+                val response = tracksApiService.getTracksByArea(overpassQuery)
+                emit(ResultState.Loading("Mapping tracks1"))
+                val elements = response.elements
+                emit(ResultState.Loading("Mapping tracks"))
+
+                val trackList =  processTracks(elements.mapListToDomain())
+                emit(ResultState.Loading("Insert tracks to DB"))
+
+            try {
+
+                insertTracksWithTransaction(
+                    trackList
+                )
+            } catch (e: Exception){
+                com.guahoo.data.network.L.d("REPOS ${e.message}")
+            }
 
 
-            val elements = response.elements
+          //  }
 
-            val trackList =  processTracks(elements.mapListToDomain())
-            insertTracksWithTransaction(
-                trackList
-            )
-
-            val tracksFromDb = getAllTracks()
+           // val tracksFromDb = getAllTracks()
+            emit(ResultState.Loading("get Tracks from DB"))
+          //  preferencesService.trackIsDownloaded = System.currentTimeMillis().toString()
 
             emit(ResultState.Success(trackList))
 
@@ -72,7 +95,7 @@ class TracksRepositoryImpl(
         } catch (e: IOException) {
             emit(ResultState.Error("Couldn't reach server, check your internet connection ${e.message}"))
         } catch (e: Exception) {
-            emit(ResultState.Error("An unexpected error occurred: ${e.message}"))
+            emit(ResultState.Error("An unexpected error occurred: ${e}"))
         }
     }
 //    relation["route"="hiking"]["osmc:symbol"="red:white:red_bar"](41.051, 40.992, 43.585, 47.316);
@@ -82,36 +105,36 @@ class TracksRepositoryImpl(
 
 
     private fun createOverpassQuery(): String = """
-              [out:json][timeout:25];
+           [out:json][timeout:25];
 // Get the relation that represents the boundary of Georgia
 area["ISO3166-1"="GE"][boundary=administrative][admin_level=2]->.searchArea;
 
 // Find all hiking routes within Georgia's boundaries
 (
-//  relation
-//    ["route"="hiking"]["type"="route"]
-//    ["name"~"Trail|trail|hike|trails|Trails|Hike|Track|track"]
-//   (area.searchArea);
-//
+  relation
+    ["route"="hiking"]["type"="route"]
+    ["name"~"Trail|trail|hike|trails|Trails|Hike|Track|track"]
+   (area.searchArea);
+
 //  relation
 //    ["route"="hiking"]["osmc:symbol"="blue:white:blue_bar"]
 //    (area.searchArea);
-
-  relation
-    ["route"="hiking"]["osmc:symbol"="red:white:red_bar"]
-    (area.searchArea);  
-    
-    relation
-    ["route"="foot"]["osmc:symbol"="red:white:red_bar"]
-    (area.searchArea);
-
-  relation
-    ["route"="hiking"]["osmc:symbol"="yellow:white:yellow_bar"]
-    (area.searchArea);  
-    
-    relation
-    ["route"="foot"]["osmc:symbol"="yellow:white:yellow_bar"]
-    (area.searchArea);
+//
+//  relation
+//    ["route"="hiking"]["osmc:symbol"="red:white:red_bar"]
+//    (area.searchArea);  
+//    
+//    relation
+//    ["route"="foot"]["osmc:symbol"="red:white:red_bar"]
+//    (area.searchArea);
+//
+//  relation
+//    ["route"="hiking"]["osmc:symbol"="yellow:white:yellow_bar"]
+//    (area.searchArea);  
+//    
+//    relation
+//    ["route"="foot"]["osmc:symbol"="yellow:white:yellow_bar"]
+//    (area.searchArea);
 );
 out body;
 >;
@@ -130,9 +153,6 @@ out skel qt;
             .map { relation ->
                 val trackList = processRelation(relation, waysMap, nodesMap)
                 trackList
-
-
-
             }
     }
 
@@ -159,15 +179,11 @@ out skel qt;
 
                 if (nodeList.isNotEmpty()){
                     if (nodeList.last().id == trackPoints.first().id) {
-                        Log.v("asdsadsada","== ${way.id}")
                         nodeList.addAll(trackPoints)
                     } else if (nodeList.last().id == trackPoints.last().id) {
-                        Log.v("asdsadsada","reverse ${way.id}")
                         nodeList.addAll(trackPoints.reversed())
 
                     } else if (nodeList.last().id != trackPoints.first().id) {
-                        Log.v("asdsadsada","check ${way.id}")
-
                         // Проверяем, есть ли во втором списке точка с id, уже присутствующим в первом списке
                         val matchingPointIndex = trackPoints.indexOfFirst { point ->
                             nodeList.any { it.id == point.id }

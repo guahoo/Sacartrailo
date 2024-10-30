@@ -27,9 +27,17 @@ android {
     signingConfigs {}
 
     buildTypes {
+
+        release {
+            isDebuggable = true
+            isMinifyEnabled = false
+            proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
+        }
+
         getByName("release") {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("debug")
 
         }
 
@@ -64,6 +72,11 @@ android {
         compose = true
     }
 
+    configurations.all {
+        exclude(group = "xmlpull", module = "xmlpull")
+        exclude(group = "kxml2", module = "kxml2")
+    }
+
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"  // Use a compatible Compose Compiler version
     }
@@ -90,6 +103,7 @@ dependencies {
 
     implementation(libs.androidx.activity.ktx)
     implementation(libs.coil.kt.coil.compose)
+    implementation(libs.androidx.ui.tooling.preview.android)
     kapt(libs.kotlinx.metadata.jvm)
     implementation (libs.androidx.activity.compose)
     implementation (libs.androidx.navigation.compose)
@@ -108,8 +122,7 @@ dependencies {
     //Map
     implementation(libs.locationtech.jts.core)
     implementation (libs.osmdroid.android)
-    implementation (libs.osmdroid.wms)      // WMS support if needed
-    implementation (libs.osmdroid.mapsforge)// Optional, if using Mapsforge
-  //  implementation("org.osmdroid:osmbonuspack:6.9.0") // Marker clustering support
+    implementation(files("libs/osmbonuspack_6.9.0.aar"))
+
 
 }

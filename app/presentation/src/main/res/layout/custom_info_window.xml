@@ -1,18 +1,19 @@
 <!-- custom_info_window.xml -->
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_height="wrap_content"
     android:layout_width="wrap_content"
     android:padding="5dp">
-
 <LinearLayout
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
+    android:id="@+id/clickable_layout"
+    android:clickable="true"
+    android:focusable="true"
     android:background="@color/light_grey"
-    android:gravity="center"
+    android:gravity="start"
     android:orientation="vertical"
-    android:padding="10dp"
-    tools:ignore="UselessParent">
+    android:padding="10dp">
 
     <TextView
         android:id="@+id/title_text"
@@ -33,17 +34,21 @@
             android:id="@+id/info_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="start"
+            android:gravity="start"
             android:textColor="@color/black"
             tools:text="Info Text" />
 
         <ImageView
             android:id="@+id/info_image"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
             android:layout_gravity="center_vertical"
             android:layout_marginStart="10dp"
             tools:background="@drawable/blue_marker" />
     </LinearLayout>
 </LinearLayout>
 
-</FrameLayout>
+
+
+</RelativeLayout>

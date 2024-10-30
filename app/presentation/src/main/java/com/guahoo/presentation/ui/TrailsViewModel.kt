@@ -1,6 +1,7 @@
 package com.guahoo.presentation.ui
 
 import androidx.lifecycle.ViewModel
+import com.guahoo.data.preferenses.PreferencesService
 import com.guahoo.domain.commons.ResultState
 import com.guahoo.domain.entity.Track
 import com.guahoo.domain.usecase.GetTracksUseCase
@@ -17,6 +18,7 @@ import javax.inject.Inject
 @HiltViewModel
 open class TrailsViewModel @Inject constructor(
     private val getTracksUseCase: GetTracksUseCase,
+    private val preferencesService: PreferencesService
 ) : ViewModel() {
 
     private val _tracksState = MutableStateFlow<ResultState<List<Track>>>(ResultState.PreAction)
@@ -29,9 +31,12 @@ open class TrailsViewModel @Inject constructor(
 
     private val trackScope = CoroutineScope(Dispatchers.IO + SupervisorJob() + exceptionHandler)
 
-    fun fetchTracks(){
+
+
+    fun fetchTracks(resetPrefs: Boolean = false){
         trackScope.launch {
-            _tracksState.emit(ResultState.Loading)
+            //_tracksState.emit(ResultState.Loading())
+            if (resetPrefs) preferencesService.trackIsDownloaded = null
             getTracksUseCase.invoke().collect { tracksData ->
                     _tracksState.emit(tracksData)
             }

@@ -2,15 +2,15 @@ package com.guahoo.data.preferenses
 
 import android.content.SharedPreferences
 
-class PreferencesService(sharedPreferences: SharedPreferences) {
-     var cityName by PrefWrapper<String>(
-        sharedPreferences,
-        APP_PREFERENCES_CITY_NAME_KEY,
-        secured = false
-    )
+class PreferencesService(private val sharedPreferences: SharedPreferences) {
+    var trackIsDownloaded: String?
+        get() = sharedPreferences.getString(APP_PREFERENCES_TREKS_IS_DOWNLOADED, null)
+        set(value) {
+            sharedPreferences.edit().putString(APP_PREFERENCES_TREKS_IS_DOWNLOADED, value).apply()
+        }
 
     companion object {
         const val APP_PREFERENCES = "APP_PREFERENCES"
-        const val APP_PREFERENCES_CITY_NAME_KEY = "APP_PREFERENCES_CITY_NAME_KEY"
+        const val APP_PREFERENCES_TREKS_IS_DOWNLOADED = "APP_PREFERENCES_TREKS_IS_DOWNLOADED"
     }
 }
