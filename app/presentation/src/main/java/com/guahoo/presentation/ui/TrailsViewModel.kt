@@ -35,7 +35,6 @@ open class TrailsViewModel @Inject constructor(
 
     fun fetchTracks(resetPrefs: Boolean = false){
         trackScope.launch {
-            //_tracksState.emit(ResultState.Loading())
             if (resetPrefs) preferencesService.trackIsDownloaded = null
             getTracksUseCase.invoke().collect { tracksData ->
                     _tracksState.emit(tracksData)

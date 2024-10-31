@@ -3,15 +3,18 @@ package com.guahoo.presentation.ui.base
 import android.content.Context
 import android.content.Intent
 import android.graphics.Paint
+import android.graphics.Point
 import android.net.Uri
 import android.util.Log
 import android.util.Xml
+import android.view.MotionEvent
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +26,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -48,8 +52,10 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.guahoo.app.presentation.R
 import com.guahoo.data.mapper.Extensions.haversineDistance
+import com.guahoo.data.network.L
 import com.guahoo.domain.entity.Node
 import com.guahoo.domain.entity.Track
+import com.guahoo.presentation.ui.base.BaseScreen.Companion.addTrackPolyline
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.LineString
@@ -69,6 +75,7 @@ import java.io.FileOutputStream
 import java.io.OutputStreamWriter
 import java.io.StringWriter
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 
 class BaseScreen {
@@ -125,12 +132,11 @@ class BaseScreen {
             var showBottomSheet by remember { mutableStateOf<Track?>(null) }
 
             val selectedPolylines = mutableListOf<Polyline>()
-            Log.d("TRACK_COUNT", "${tracks.size}")
+            L.d("TRACK_COUNT ${tracks.size}")
 
             Box(modifier = modifier) {
                 OSMDroidMapView(modifier) {
                     overlayManager.clear()
-
 
                     tracks.forEach { track ->
                         addTrackPolyline(track, selectedPolylines,
@@ -138,8 +144,8 @@ class BaseScreen {
                                 showBottomSheet = selectedTrack // Set showBottomSheet
                             })
                     }
-
                     handleMapEvents(selectedPolylines)
+
                 }
             }
 
@@ -178,18 +184,30 @@ class BaseScreen {
             selectedPolylines: MutableList<Polyline>,
             onInfoWindowClick: (Track) -> Unit
         ) {
-            val polyline = Polyline().apply {
-                id = track.groupId.toString()
-                title = track.tags?.get("name") + "\n${track.id.toString()}"
-                color = track.color ?: com.guahoo.data.R.color.black
-                width = 10.0f
-                alpha = 0.8f
+            // Create the visible polyline
+            val visiblePolyline = Polyline().apply {
+                id = "${track.groupId}"
+                title = "${track.tags?.get("name")}\n${track.id}"
+                color = track.color ?: com.guahoo.data.R.color.black // Fill color
+                width = 10.0f // Width of the visible stroke
+               // alpha = 0.8f // Optional: Adjust transparency if needed
                 outlinePaint.strokeCap = Paint.Cap.ROUND
-                outlinePaint.isAntiAlias = true
+               // outlinePaint.isAntiAlias = true
                 setPoints(track.nodes?.mapToGeoPoint())
             }
 
-            polyline.setOnClickListener { _, _, point ->
+
+ //Create the transparent polyline for click detection
+            val clickablePolyline = Polyline().apply {
+                id = "${track.groupId}"
+                title = "${track.tags?.get("name")}\n${track.id}"
+                width = 100.0f // Width of the clickable area
+                outlinePaint.color = context.resources.getColor(com.guahoo.data.R.color.transparent , null)// Fill color)
+                setPoints(track.nodes?.mapToGeoPoint())
+            }
+
+
+            clickablePolyline.setOnClickListener { polyline, _, point ->
                 handlePolylineClick(
                     this,
                     polyline,
@@ -200,8 +218,11 @@ class BaseScreen {
                 )
                 true
             }
+            overlays.add(visiblePolyline)
+            overlays.add(clickablePolyline)
 
-            overlays.add(polyline)
+
+            this.invalidate()
         }
 
         private fun MapView.handlePolylineClick(
@@ -215,7 +236,7 @@ class BaseScreen {
             val trackList = mapView.overlays.filterIsInstance<Polyline>()
                 .filter { it.id == track.groupId.toString() }
 
-            val geoPoints = trackList.flatMap { it.actualPoints }
+            val geoPoints = track.nodes?.mapToGeoPoint()?: listOf()
             resetSelectedPolylines(mapView, selectedPolylines)
 
             val distance = calculateTotalDistance(geoPoints)
@@ -416,14 +437,22 @@ class BaseScreen {
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(
                             modifier = Modifier
-                                .height(40.dp) // Adjusted height to better fit text
-                                .padding(horizontal = 8.dp), // Optional padding
+                                .height(40.dp)
+                                .padding(horizontal = 8.dp),
+
                             onClick = {
                                 showSaveGpxScreen = true
                             },
                             content = {
-                                Text(text = "Download")
-                            }
+                                Text(
+                                    text = "Download",
+                                    color = Color(0xFFFFEA00)
+                                )
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF6C873D), // Change this to your desired background color
+                                contentColor = Color.White // Change this to your desired text color
+                            ),
                         )
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -440,8 +469,12 @@ class BaseScreen {
 
                             },
                             content = {
-                                Text(text = "Share")
-                            }
+                                Text(text = "Share", color = Color(0xFFFFEA00))
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF6C873D), // Change this to your desired background color
+                                contentColor = Color.White // Change this to your desired text color
+                            )
                         )
                     }
                 }

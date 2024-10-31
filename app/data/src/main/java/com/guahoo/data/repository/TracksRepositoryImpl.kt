@@ -1,7 +1,7 @@
 package com.guahoo.data.repository
 
 import android.graphics.Color
-import android.icu.lang.UCharacter.GraphemeClusterBreak.L
+
 import android.util.Log
 import androidx.room.Transaction
 import com.guahoo.data.db.dao.TrackDao
@@ -9,6 +9,7 @@ import com.guahoo.data.db.model.toDomainModel
 import com.guahoo.data.db.model.toEntity
 import com.guahoo.data.mapper.mapListToDomain
 import com.guahoo.data.mapper.mapToTrack
+import com.guahoo.data.network.L
 import com.guahoo.data.network.TracksApiService
 import com.guahoo.data.preferenses.PreferencesService
 import com.guahoo.domain.commons.ResultState
@@ -36,59 +37,50 @@ class TracksRepositoryImpl(
 
     @Transaction
     suspend fun insertTracksWithTransaction(tracks: List<Track>) {
-        com.guahoo.data.network.L.d("REPOS123 ${tracks.size}")
         tracks.forEach { insertTrackOrUpdateTrack(it) }
     }
 
 
-
     override suspend fun insertTrackOrUpdateTrack(track: Track) {
-        com.guahoo.data.network.L.d("REPOS1336 ${track}")
-            val existingTrack = trackDao.getTrackById(track.id)
-        com.guahoo.data.network.L.d("REPOS ${track}")
-            val trackEntity = track.toEntity()
-        com.guahoo.data.network.L.d("REPOS1 ${track}")
-            if (existingTrack != null) {
-                com.guahoo.data.network.L.d("REPOS2 ${track}")
-                trackDao.updateTrack(trackEntity)
-            } else {
-                com.guahoo.data.network.L.d("REPOS3 ${track}")
-                trackDao.insertTrack(trackEntity)
-                com.guahoo.data.network.L.d("REPOS4 ${track}")
-            }
+        val existingTrack = trackDao.getTrackById(track.id)
+        val trackEntity = track.toEntity()
+        if (existingTrack != null) {
+            trackDao.updateTrack(trackEntity)
+        } else {
+            trackDao.insertTrack(trackEntity)
         }
+    }
 
     override fun fetchTracks(): Flow<ResultState<List<Track>>> = flow {
         val overpassQuery = createOverpassQuery()
 
         try {
-      //      if (preferencesService.trackIsDownloaded.isNullOrEmpty()){
+            if (preferencesService.trackIsDownloaded.isNullOrEmpty()) {
                 emit(ResultState.Loading("Downloading tracks"))
                 val response = tracksApiService.getTracksByArea(overpassQuery)
                 emit(ResultState.Loading("Mapping tracks1"))
                 val elements = response.elements
                 emit(ResultState.Loading("Mapping tracks"))
 
-                val trackList =  processTracks(elements.mapListToDomain())
+                val trackList = processTracks(elements.mapListToDomain())
                 emit(ResultState.Loading("Insert tracks to DB"))
 
-            try {
+                try {
+                    insertTracksWithTransaction(
+                        trackList
+                    )
+                } catch (e: Exception) {
+                    com.guahoo.data.network.L.d("REPOS ${e.message}")
+                }
 
-                insertTracksWithTransaction(
-                    trackList
-                )
-            } catch (e: Exception){
-                com.guahoo.data.network.L.d("REPOS ${e.message}")
             }
 
+            val tracksFromDb = getAllTracks()
 
-          //  }
-
-           // val tracksFromDb = getAllTracks()
             emit(ResultState.Loading("get Tracks from DB"))
-          //  preferencesService.trackIsDownloaded = System.currentTimeMillis().toString()
+            preferencesService.trackIsDownloaded = System.currentTimeMillis().toString()
 
-            emit(ResultState.Success(trackList))
+            emit(ResultState.Success(tracksFromDb))
 
         } catch (e: HttpException) {
             emit(ResultState.Error("An unexpected error occurred HTTP: ${e.message}"))
@@ -103,7 +95,6 @@ class TracksRepositoryImpl(
 //    relation["route"="hiking"]["osmc:symbol"="yellow:white:yellow_bar"](41.051, 40.992, 43.585, 47.316);
 
 
-
     private fun createOverpassQuery(): String = """
            [out:json][timeout:25];
 // Get the relation that represents the boundary of Georgia
@@ -116,25 +107,25 @@ area["ISO3166-1"="GE"][boundary=administrative][admin_level=2]->.searchArea;
     ["name"~"Trail|trail|hike|trails|Trails|Hike|Track|track"]
    (area.searchArea);
 
-//  relation
-//    ["route"="hiking"]["osmc:symbol"="blue:white:blue_bar"]
-//    (area.searchArea);
-//
-//  relation
-//    ["route"="hiking"]["osmc:symbol"="red:white:red_bar"]
-//    (area.searchArea);  
-//    
-//    relation
-//    ["route"="foot"]["osmc:symbol"="red:white:red_bar"]
-//    (area.searchArea);
-//
-//  relation
-//    ["route"="hiking"]["osmc:symbol"="yellow:white:yellow_bar"]
-//    (area.searchArea);  
-//    
-//    relation
-//    ["route"="foot"]["osmc:symbol"="yellow:white:yellow_bar"]
-//    (area.searchArea);
+  relation
+    ["route"="hiking"]["osmc:symbol"="blue:white:blue_bar"]
+    (area.searchArea);
+
+  relation
+    ["route"="hiking"]["osmc:symbol"="red:white:red_bar"]
+    (area.searchArea);  
+
+    relation
+    ["route"="foot"]["osmc:symbol"="red:white:red_bar"]
+    (area.searchArea);
+
+  relation
+    ["route"="hiking"]["osmc:symbol"="yellow:white:yellow_bar"]
+    (area.searchArea);  
+
+    relation
+    ["route"="foot"]["osmc:symbol"="yellow:white:yellow_bar"]
+    (area.searchArea);
 );
 out body;
 >;
@@ -177,7 +168,7 @@ out skel qt;
 
 
 
-                if (nodeList.isNotEmpty()){
+                if (nodeList.isNotEmpty()) {
                     if (nodeList.last().id == trackPoints.first().id) {
                         nodeList.addAll(trackPoints)
                     } else if (nodeList.last().id == trackPoints.last().id) {
@@ -217,7 +208,6 @@ out skel qt;
             color = relationColor
         )
     }
-
 
 
     private fun getRandomColor(): String {

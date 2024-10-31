@@ -24,12 +24,13 @@ android {
 
 
 
-    signingConfigs {}
+    signingConfigs {
+
+    }
 
     buildTypes {
 
         release {
-            isDebuggable = true
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
         }
@@ -37,8 +38,6 @@ android {
         getByName("release") {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug")
-
         }
 
         create("pre") {
@@ -123,6 +122,4 @@ dependencies {
     implementation(libs.locationtech.jts.core)
     implementation (libs.osmdroid.android)
     implementation(files("libs/osmbonuspack_6.9.0.aar"))
-
-
 }

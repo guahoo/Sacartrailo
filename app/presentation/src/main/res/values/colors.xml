@@ -10,6 +10,7 @@
     <color name="purple_800">#FF1E0086</color>
     <color name="purple_900">#FF0A004B</color>
 
+    <color name="transparent">#00000000</color>
     <color name="teal_100">#FF80D8FF</color>
     <color name="teal_200">#FF03DAC5</color>
     <color name="teal_300">#FF00BFAE</color>
