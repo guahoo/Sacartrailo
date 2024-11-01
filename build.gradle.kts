@@ -10,8 +10,8 @@ allprojects {
 
     extra.apply {
         set("androidApplicationId", "com.guahoo.sakartrailo")
-        set("androidVersionCode", 1_000_005)
-        set("androidVersionName", "1.00.5")
+        set("androidVersionCode", 1_000_006)
+        set("androidVersionName", "1.00.6")
         set("androidMinSdkVersion", 26)
         set("androidTargetSdkVersion", 34)
         set("androidCompileSdkVersion", 34)

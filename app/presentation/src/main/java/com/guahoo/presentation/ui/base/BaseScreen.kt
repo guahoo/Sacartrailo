@@ -2,19 +2,18 @@ package com.guahoo.presentation.ui.base
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.Point
 import android.net.Uri
 import android.util.Log
 import android.util.Xml
-import android.view.MotionEvent
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -50,17 +50,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.graphics.drawable.DrawableCompat
 import com.guahoo.app.presentation.R
 import com.guahoo.data.mapper.Extensions.haversineDistance
 import com.guahoo.data.network.L
 import com.guahoo.domain.entity.Node
 import com.guahoo.domain.entity.Track
-import com.guahoo.presentation.ui.base.BaseScreen.Companion.addTrackPolyline
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.LineString
 import org.locationtech.jts.simplify.DouglasPeuckerSimplifier
+import org.osmdroid.bonuspack.clustering.RadiusMarkerClusterer
 import org.osmdroid.events.MapEventsReceiver
+import org.osmdroid.events.MapListener
+import org.osmdroid.events.ScrollEvent
+import org.osmdroid.events.ZoomEvent
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
@@ -75,7 +79,6 @@ import java.io.FileOutputStream
 import java.io.OutputStreamWriter
 import java.io.StringWriter
 import kotlin.math.roundToInt
-import kotlin.math.sqrt
 
 
 class BaseScreen {
@@ -132,19 +135,61 @@ class BaseScreen {
             var showBottomSheet by remember { mutableStateOf<Track?>(null) }
 
             val selectedPolylines = mutableListOf<Polyline>()
-            L.d("TRACK_COUNT ${tracks.size}")
+
+
+            val clusterer = RadiusMarkerClusterer(LocalContext.current).apply {
+              // Adjust radius as needed
+                setMaxClusteringZoomLevel(11)
+                setIcon(getBitmapFromDrawable(R.drawable.cluster_icon))
+            }
+
 
             Box(modifier = modifier) {
                 OSMDroidMapView(modifier) {
                     overlayManager.clear()
 
                     tracks.forEach { track ->
-                        addTrackPolyline(track, selectedPolylines,
+                      addTrackPolyline(track, selectedPolylines,
                             onInfoWindowClick = { selectedTrack ->
                                 showBottomSheet = selectedTrack // Set showBottomSheet
                             })
+                        if (track.nodes?.isNotEmpty() == true) {
+                            val marker = createMarker(
+                                this,
+                                GeoPoint(track.nodes?.first()?.lat!!, track.nodes?.first()?.lon!!),
+                                track,
+                                0,
+                                context = this.context,
+                                infoMarker = true
+                            )
+                            clusterer.add(marker)
+                        }
                     }
+
+                    clusterer
                     handleMapEvents(selectedPolylines)
+                    overlayManager.add(clusterer)
+
+
+                    this.addMapListener(object : MapListener {
+                        override fun onZoom(event: ZoomEvent): Boolean {
+                            overlays?.filterIsInstance<Polyline>()
+                                ?.forEach {
+                                    it.isVisible = event.zoomLevel >= 12
+
+                                }
+
+                               //  clusterer.isEnabled = event.zoomLevel <= 11
+                            //  this@OSMDroidMapView.invalidate() // Refresh the map to apply changes
+
+                            this@OSMDroidMapView.invalidate()
+                            return true
+                        }
+
+                        override fun onScroll(event: ScrollEvent?): Boolean {
+                            return false
+                        }
+                    })
 
                 }
             }
@@ -155,6 +200,26 @@ class BaseScreen {
                     context = LocalContext.current,
                     onDismiss = { showBottomSheet = null }
                 )
+            }
+        }
+
+
+        @Composable
+        fun getBitmapFromDrawable(drawableResId: Int): Bitmap? {
+            val context = LocalContext.current
+            val drawable = ContextCompat.getDrawable(context, drawableResId)
+            return drawable?.let {
+                val bitmap = Bitmap.createBitmap(
+                    it.intrinsicWidth,
+                    it.intrinsicHeight,
+                    Bitmap.Config.ARGB_8888
+                )
+                val canvas = Canvas(bitmap)
+                DrawableCompat.wrap(it).apply {
+                    setBounds(0, 0, canvas.width, canvas.height)
+                    draw(canvas)
+                }
+                bitmap
             }
         }
 
@@ -169,8 +234,9 @@ class BaseScreen {
                     MapView(context).apply {
                         setTileSource(TileSourceFactory.MAPNIK)
                         setMultiTouchControls(true)
-                        controller.setZoom(10.0)
-                        controller.setCenter(GeoPoint(42.000, 43.500, 0.0))
+
+                        controller.zoomTo(10)
+                        controller.animateTo(GeoPoint(42.2679, 42.7180))
                         isTilesScaledToDpi = true
                         mapViewConfig(this)
                     }
@@ -183,26 +249,30 @@ class BaseScreen {
             track: Track,
             selectedPolylines: MutableList<Polyline>,
             onInfoWindowClick: (Track) -> Unit
-        ) {
+        ): Polyline {
             // Create the visible polyline
             val visiblePolyline = Polyline().apply {
                 id = "${track.groupId}"
                 title = "${track.tags?.get("name")}\n${track.id}"
                 color = track.color ?: com.guahoo.data.R.color.black // Fill color
                 width = 10.0f // Width of the visible stroke
-               // alpha = 0.8f // Optional: Adjust transparency if needed
+                //isVisible = false
+                // alpha = 0.8f // Optional: Adjust transparency if needed
                 outlinePaint.strokeCap = Paint.Cap.ROUND
-               // outlinePaint.isAntiAlias = true
+                // outlinePaint.isAntiAlias = true
                 setPoints(track.nodes?.mapToGeoPoint())
             }
 
 
- //Create the transparent polyline for click detection
+            //Create the transparent polyline for click detection
             val clickablePolyline = Polyline().apply {
                 id = "${track.groupId}"
                 title = "${track.tags?.get("name")}\n${track.id}"
                 width = 100.0f // Width of the clickable area
-                outlinePaint.color = context.resources.getColor(com.guahoo.data.R.color.transparent , null)// Fill color)
+                outlinePaint.color = context.resources.getColor(
+                    com.guahoo.data.R.color.transparent,
+                    null
+                )// Fill color)
                 setPoints(track.nodes?.mapToGeoPoint())
             }
 
@@ -222,7 +292,9 @@ class BaseScreen {
             overlays.add(clickablePolyline)
 
 
+
             this.invalidate()
+            return visiblePolyline
         }
 
         private fun MapView.handlePolylineClick(
@@ -236,7 +308,7 @@ class BaseScreen {
             val trackList = mapView.overlays.filterIsInstance<Polyline>()
                 .filter { it.id == track.groupId.toString() }
 
-            val geoPoints = track.nodes?.mapToGeoPoint()?: listOf()
+            val geoPoints = track.nodes?.mapToGeoPoint() ?: listOf()
             resetSelectedPolylines(mapView, selectedPolylines)
 
             val distance = calculateTotalDistance(geoPoints)
@@ -275,7 +347,7 @@ class BaseScreen {
             track: Track,
             geoPoints: List<GeoPoint>,
             distance: Int
-        ) {
+        ): List<Marker> {
             val startMarker =
                 createMarker(mapView, geoPoints.first(), track, distance, context = this.context)
             val endMarker = createMarker(
@@ -289,6 +361,8 @@ class BaseScreen {
 
             overlays.add(startMarker)
             overlays.add(endMarker)
+
+            return (listOf(startMarker, endMarker))
         }
 
         private fun createMarker(
@@ -350,7 +424,7 @@ class BaseScreen {
             val symbol = track.tags?.get("osmc:symbol")
             var showSaveGpxScreen by remember { mutableStateOf(false) }
 
-          ModalBottomSheet(
+            ModalBottomSheet(
                 onDismissRequest = onDismiss,
                 containerColor = Color.White,
                 content = {
@@ -462,7 +536,11 @@ class BaseScreen {
                                 .height(40.dp) // Adjusted height to better fit text
                                 .padding(horizontal = 8.dp), // Optional padding
                             onClick = {
-                                val gpxUri = saveGpxFile(context, generateGpxContent( track.nodes?: listOf()), title)
+                                val gpxUri = saveGpxFile(
+                                    context,
+                                    generateGpxContent(track.nodes ?: listOf()),
+                                    title
+                                )
                                 gpxUri?.let {
                                     shareGpxFile(context, it)
                                 }
