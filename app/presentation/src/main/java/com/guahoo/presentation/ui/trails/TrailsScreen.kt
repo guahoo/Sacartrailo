@@ -57,7 +57,7 @@ class TrailsScreen: BaseScreen() {
             val successData = trackState.tracks
             nodeTracks.clear()
             nodeTracks.addAll(successData)
-            TrailsScreen().SuccessScreen(
+            SuccessScreen(
                 nodeTracks = nodeTracks,
                 viewModel = viewModel
             )
