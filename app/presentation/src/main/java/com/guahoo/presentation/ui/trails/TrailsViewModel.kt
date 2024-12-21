@@ -10,35 +10,86 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-open class TrailsViewModel @Inject constructor(
+class TrailsViewModel @Inject constructor(
     private val getTracksUseCase: GetTracksUseCase,
     private val preferencesService: PreferencesService
 ) : ViewModel() {
 
-    private val _tracksState = MutableStateFlow<ResultState<List<Track>>>(ResultState.PreAction)
-    val tracksState: StateFlow<ResultState<List<Track>>> = _tracksState
+    sealed class Intent {
+        data object FetchTracks : Intent()
+        data object ResetPreferences : Intent()
+    }
 
+    data class State(
+        val tracks: List<Track> = emptyList(),
+        val isLoading: Boolean = false,
+        val errorMessage: String? = null
+    )
+
+    private val _state = MutableStateFlow(State())
+    val state: StateFlow<State> = _state.asStateFlow()
 
     private val exceptionHandler = CoroutineExceptionHandler { _, exception ->
         println("Exception caught: $exception ${exception.stackTraceToString()} ${exception.message} ${exception.cause}")
+        _state.update { currentState ->
+            currentState.copy(
+                isLoading = false,
+                errorMessage = exception.message
+            )
+        }
     }
+
+    private val intentChannel = Channel<Intent>(Channel.UNLIMITED)
 
     private val trackScope = CoroutineScope(Dispatchers.IO + SupervisorJob() + exceptionHandler)
 
+    init {
+        handleIntents()
+    }
 
-
-    fun fetchTracks(resetPrefs: Boolean = false){
+    private fun handleIntents() {
         trackScope.launch {
-            if (resetPrefs) preferencesService.trackIsDownloaded = null
-            getTracksUseCase.invoke().collect { tracksData ->
-                    _tracksState.emit(tracksData)
+            intentChannel.consumeAsFlow().collect { intent ->
+                when (intent) {
+                    is Intent.FetchTracks -> fetchTracks()
+                    is Intent.ResetPreferences -> resetPreferencesAndFetchTracks()
+                }
             }
         }
+    }
+
+    private fun fetchTracks() {
+        trackScope.launch {
+            _state.update { it.copy(isLoading = true, errorMessage = null) }
+            getTracksUseCase.invoke().collect { tracksData ->
+                when (tracksData) {
+                    is ResultState.Success -> _state.update { it.copy(isLoading = false, tracks = tracksData.data) }
+                    is ResultState.Error -> _state.update { it.copy(isLoading = false, errorMessage = tracksData.message) }
+                    else -> _state.update { it.copy(isLoading = false) }
+                }
+            }
+        }
+    }
+
+    private fun resetPreferencesAndFetchTracks() {
+        trackScope.launch {
+            preferencesService.trackIsDownloaded = null
+            fetchTracks()
+        }
+    }
+
+    // Exposed function for UI to send intents
+    fun processIntent(intent: Intent) {
+        trackScope.launch { intentChannel.send(intent) }
     }
 }
