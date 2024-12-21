@@ -45,18 +45,22 @@ class TrailsScreen: BaseScreen() {
         }
 
 
-        if (trackState.tracks.isNotEmpty()) {
-            val successData = (trackState as ResultState.Success<List<Track>>).data
-            nodeTracks.clear()
-            nodeTracks.addAll(successData)
-        }
-
         if (trackState.isLoading) {
             LoadingScreen("Loading")
         }
 
         if (trackState.errorMessage != null) {
             ErrorScreen(trackState.errorMessage ?: "")
+        }
+
+        if (trackState.tracks.isNotEmpty()) {
+            val successData = trackState.tracks
+            nodeTracks.clear()
+            nodeTracks.addAll(successData)
+            TrailsScreen().SuccessScreen(
+                nodeTracks = nodeTracks,
+                viewModel = viewModel
+            )
         }
 
     }
