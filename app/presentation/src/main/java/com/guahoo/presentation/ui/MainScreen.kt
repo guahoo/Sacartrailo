@@ -7,20 +7,21 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.guahoo.presentation.ui.trails.TrailsScreen
+import com.guahoo.presentation.ui.trails.TrailsViewModel
 
 
 @Composable
 fun MainScreen(viewModel: TrailsViewModel) {
     val navController = rememberNavController()
 
-    Scaffold(
-    ) { innerPadding ->
+    Scaffold() { innerPadding ->
         NavHost(
             navController = navController,
             startDestination = "forecast",
             modifier = Modifier.padding(innerPadding)
         ){
-            composable("forecast") { InitTrackScreen(viewModel) }
+            composable("forecast") { TrailsScreen().InitTrackScreen(viewModel) }
         }
     }
 }

@@ -1,4 +1,4 @@
-package com.guahoo.presentation.ui
+package com.guahoo.presentation.ui.trails
 
 import androidx.lifecycle.ViewModel
 import com.guahoo.data.preferenses.PreferencesService
